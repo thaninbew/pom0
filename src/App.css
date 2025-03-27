@@ -18,3 +18,11 @@
 .mode-transition {
   transition: color 0.3s ease, background-color 0.3s ease;
 }
+
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.non-draggable {
+  -webkit-app-region: no-drag;
+}
