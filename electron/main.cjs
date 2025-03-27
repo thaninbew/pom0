@@ -51,6 +51,8 @@ function createPopoutWindow() {
     return;
   }
 
+  console.log('Creating popout window');
+  
   popoutWindow = new BrowserWindow({
     width: 300,
     height: 200,
@@ -68,20 +70,31 @@ function createPopoutWindow() {
     }
   });
 
-  // Load the popout HTML file
-  popoutWindow.loadURL(
-    isDev
-      ? 'http://localhost:5173/popout.html'
-      : `file://${path.join(__dirname, '../dist/popout.html')}`
-  );
+  const popoutUrl = isDev
+    ? 'http://localhost:5173?mode=popout'
+    : `file://${path.join(__dirname, '../dist/index.html?mode=popout')}`;
+    
+  console.log('Loading popout URL:', popoutUrl);
+  
+  popoutWindow.loadURL(popoutUrl);
 
-  // Notify main window that popout is created
+  popoutWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load popout window:', errorCode, errorDescription);
+  });
+
+  popoutWindow.webContents.on('did-finish-load', () => {
+    console.log('Popout window loaded successfully');
+  });
+
+  if (isDev) {
+    popoutWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('popout-status', true);
   }
 
   popoutWindow.on('closed', () => {
-    // Notify main window that popout is closed
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('popout-status', false);
       mainWindow.webContents.send('popout-closed');
@@ -90,21 +103,17 @@ function createPopoutWindow() {
   });
 }
 
-// Set up IPC handlers
 function setupIPC() {
-  // Handler for creating popout window
   ipcMain.on('create-popout', () => {
     createPopoutWindow();
   });
 
-  // Handler for closing popout window
   ipcMain.on('close-popout', () => {
     if (popoutWindow && !popoutWindow.isDestroyed()) {
       popoutWindow.close();
     }
   });
 
-  // Timer controls
   ipcMain.on('toggle-timer', () => {
     broadcastToAll('toggle-timer');
   });
@@ -117,20 +126,22 @@ function setupIPC() {
     broadcastToAll('toggle-speed');
   });
 
-  // Timer state updates
   ipcMain.on('timer-state-update', (event, state) => {
     broadcastToAll('timer-state-update', state, event.sender);
   });
 
-  // Timer state requests
   ipcMain.on('request-timer-state', (event) => {
+    console.log('Received request for timer state, forwarding to main window');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('request-timer-state');
     }
   });
+
+  ipcMain.on('popout-unmounting', () => {
+    console.log('Popout is unmounting');
+  });
 }
 
-// Helper function to broadcast messages to all windows except sender
 function broadcastToAll(channel, data, sender = null) {
   const windows = [
     mainWindow && !mainWindow.isDestroyed() ? mainWindow : null,

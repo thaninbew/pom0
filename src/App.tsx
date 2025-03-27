@@ -4,6 +4,7 @@ import { TimerControls } from './components/TimerControls';
 import { SettingsButton } from './components/SettingsButton';
 import { PopoutButton } from './components/PopoutButton';
 import { Settings } from './components/Settings';
+import { PopoutTimer } from './components/PopoutTimer';
 import { useTimer } from './lib/useTimer';
 import { DEFAULT_SETTINGS, TimerSettings } from './lib/types';
 import './App.css';
@@ -14,43 +15,64 @@ function App() {
   const [isPopoutActive, setIsPopoutActive] = useState(false);
   const { state, toggleTimer, skipSession, speedMultiplier, toggleSpeedMode } = useTimer(settings);
 
-  // Set up IPC communication
+  const isPopoutMode = window.location.search.includes('mode=popout');
+  
   useEffect(() => {
-    // Check if we're in an Electron environment
-    if (window.electronAPI) {
-      // Listen for popout status updates
-      window.electronAPI.receive('popout-status', (status: boolean) => {
-        setIsPopoutActive(status);
-      });
+    console.log("App: Initializing, mode:", isPopoutMode ? "popout" : "normal");
+  }, [isPopoutMode]);
 
-      // Listen for timer state requests
+  useEffect(() => {
+    console.log("App: Setting up IPC communication");
+    
+    if (window.electronAPI) {
+      console.log("App: Electron API is available");
+      
+      if (!isPopoutMode) {
+        window.electronAPI.receive('popout-status', (status: unknown) => {
+          console.log("App: Received popout status", status);
+          if (typeof status === 'boolean') {
+            setIsPopoutActive(status);
+          }
+        });
+
+        window.electronAPI.receive('popout-closed', () => {
+          console.log("App: Received popout closed event");
+          setIsPopoutActive(false);
+        });
+      }
+
+      // These listeners are needed in both windows
       window.electronAPI.receive('request-timer-state', () => {
+        console.log("App: Received timer state request, sending state", state);
         window.electronAPI?.sendMessage('timer-state-update', state);
       });
 
-      // Listen for popout closed event
-      window.electronAPI.receive('popout-closed', () => {
-        setIsPopoutActive(false);
-      });
-
-      // Handle timer controls from popout window
       window.electronAPI.receive('toggle-timer', () => {
+        console.log("App: Received toggle timer command");
         toggleTimer();
       });
 
       window.electronAPI.receive('skip-session', () => {
+        console.log("App: Received skip session command");
         skipSession();
       });
 
       window.electronAPI.receive('toggle-speed', () => {
+        console.log("App: Received toggle speed command");
         toggleSpeedMode();
       });
+    } else {
+      console.log("App: Electron API is not available");
     }
-  }, [toggleTimer, skipSession, toggleSpeedMode]);
+    
+    return () => {
+      console.log("App: Cleaning up IPC listeners");
+    };
+  }, [toggleTimer, skipSession, toggleSpeedMode, isPopoutMode, state]);
 
-  // Send timer state updates when the state changes
   useEffect(() => {
-    if (window.electronAPI && isPopoutActive) {
+    if (window.electronAPI && (isPopoutActive || isPopoutMode)) {
+      console.log("App: Sending timer state update", state);
       window.electronAPI.sendMessage('timer-state-update', state);
     }
     
@@ -60,7 +82,11 @@ function App() {
       isRunning: state.isRunning,
       completedPomodoros: state.completedPomodoros
     });
-  }, [state, isPopoutActive]);
+  }, [state, isPopoutActive, isPopoutMode]);
+
+  if (isPopoutMode) {
+    return <PopoutTimer />;
+  }
 
   const handleSettingsClick = () => {
     if (state.isRunning) {
@@ -79,6 +105,7 @@ function App() {
   };
 
   const handlePopoutClick = () => {
+    console.log("App: Creating popout window");
     if (window.electronAPI) {
       window.electronAPI.sendMessage('create-popout');
     }
@@ -125,7 +152,10 @@ function App() {
                   Timer is currently in popout mode
                 </p>
                 <button 
-                  onClick={() => window.electronAPI?.sendMessage('close-popout')}
+                  onClick={() => {
+                    console.log("App: Closing popout window");
+                    window.electronAPI?.sendMessage('close-popout');
+                  }}
                   className="mt-4 px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-md text-sm"
                 >
                   Close Popout
@@ -139,6 +169,7 @@ function App() {
                 <div>Mode: {state.mode}</div>
                 <div>Running: {state.isRunning ? 'Yes' : 'No'}</div>
                 <div>Speed: {speedMultiplier}x</div>
+                <div>Electron: {window.electronAPI ? 'Available' : 'Not Available'}</div>
               </div>
             )}
           </div>
