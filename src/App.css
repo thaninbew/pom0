@@ -1,1 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color-scheme: light dark;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
 /* Custom styles can be added here */
+
+/* Additional custom styles for the pomodoro timer can be added here */
+
+/* Smooth transition effect for mode changes */
+.mode-transition {
+  transition: color 0.3s ease, background-color 0.3s ease;
+}

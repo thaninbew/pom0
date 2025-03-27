@@ -11,8 +11,8 @@ function createWindow() {
     minWidth: 600,
     minHeight: 500,
     frame: true,
-    show: false, // Hide the window until it's ready
-    backgroundColor: '#f8fafc', // Light background
+    show: false,
+    backgroundColor: '#f8fafc',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -20,21 +20,17 @@ function createWindow() {
     }
   });
 
-  // Load the index.html from a url
   mainWindow.loadURL(
     isDev
-      ? 'http://localhost:5173' // Vite dev server
+      ? 'http://localhost:5173'
       : `file://${path.join(__dirname, '../dist/index.html')}`
   );
 
-  // Show window when ready to avoid flickering
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Open DevTools if in dev mode
   if (isDev) {
-    // Open DevTools in a separate window
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
