@@ -1,63 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { TimerState, TimerMode } from '../lib/types';
-import { asciiPets, getRandomMessage, formatTime, getStatusText } from '../lib/asciiPet';
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  asciiPets,
+  getRandomMessage,
+  formatTime,
+  getStatusText,
+} from "../lib/asciiPet";
+import { TimerWrapper } from "./TimerWrapper";
 
 export function TerminalPopout() {
-  const [message, setMessage] = useState<string>('');
-  const [timerState, setTimerState] = useState<TimerState>({
-    mode: TimerMode.WORK,
-    timeRemaining: 25 * 60, 
-    isRunning: false,
-    completedPomodoros: 0,
-    pomodorosUntilLongBreak: 4,
-  });
-  
+  const [message, setMessage] = useState<string>("");
   const [isConnected, setIsConnected] = useState(false);
   const [showHotkey, setShowHotkey] = useState(true);
   const [lastKeyTime, setLastKeyTime] = useState<number>(0);
-
-  // Functions defined with useCallback to maintain reference stability
-  const handleFreeze = useCallback(() => {
-    console.log("TerminalPopout: Toggle timer clicked");
-    window.electronAPI?.sendMessage('toggle-timer');
-  }, []);
-
-  const handleSkip = useCallback(() => {
-    console.log("TerminalPopout: Skip session clicked");
-    window.electronAPI?.sendMessage('skip-session');
-  }, []);
+  const [lastMode, setLastMode] = useState<string>("");
 
   const handlePopIn = useCallback(() => {
     console.log("TerminalPopout: Popin clicked");
-    window.electronAPI?.sendMessage('close-popout');
+    window.timerAPI?.window.closePopout();
   }, []);
 
   const handleQuit = useCallback(() => {
     console.log("TerminalPopout: Quit clicked");
-    window.electronAPI?.sendMessage('quit-app');
+    window.timerAPI?.window.quit();
   }, []);
 
   useEffect(() => {
     console.log("TerminalPopout: Component mounted");
-    
-    if (window.electronAPI) {
-      console.log("TerminalPopout: Requesting timer state");
-      window.electronAPI.sendMessage('request-timer-state');
+
+    if (window.timerAPI) {
+      console.log("TerminalPopout: Connected to timer API");
       setIsConnected(true);
-      
+
       // Focus the window to ensure it can receive keyboard events
-      window.electronAPI.sendMessage('activate-window');
+      window.timerAPI.window.activate();
     } else {
-      console.log("TerminalPopout: electronAPI not available");
+      console.log("TerminalPopout: timerAPI not available");
       setIsConnected(false);
     }
-
-    window.electronAPI?.receive('timer-state-update', (data: unknown) => {
-      console.log("TerminalPopout: Received timer state update", data);
-      if (data && typeof data === 'object' && 'mode' in data && 'timeRemaining' in data) {
-        setTimerState(data as TimerState);
-      }
-    });
 
     // Hide the hotkey message after 10 seconds
     const hotKeyTimer = setTimeout(() => {
@@ -66,17 +45,11 @@ export function TerminalPopout() {
 
     return () => {
       console.log("TerminalPopout: Component unmounting");
-      window.electronAPI?.sendMessage('popout-unmounting');
       clearTimeout(hotKeyTimer);
     };
   }, []);
 
-  // Update message when timer state changes
-  useEffect(() => {
-    setMessage(getRandomMessage(timerState.mode));
-  }, [timerState.mode, timerState.isRunning]);
-
-  // Handle keyboard events for this window
+  // Handle keyboard events for non-timer controls
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!isConnected) return;
@@ -87,24 +60,14 @@ export function TerminalPopout() {
         return;
       }
       setLastKeyTime(now);
-      
+
       switch (e.key.toLowerCase()) {
-        case 'f':
-          e.preventDefault();
-          e.stopPropagation();
-          handleFreeze();
-          break;
-        case 's':
-          e.preventDefault();
-          e.stopPropagation();
-          handleSkip();
-          break;
-        case 'p':
+        case "p":
           e.preventDefault();
           e.stopPropagation();
           handlePopIn();
           break;
-        case 'q':
+        case "q":
           e.preventDefault();
           e.stopPropagation();
           handleQuit();
@@ -114,66 +77,78 @@ export function TerminalPopout() {
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isConnected, lastKeyTime, handleFreeze, handleSkip, handlePopIn, handleQuit]);
-
-  // Format the pet display
-  const petDisplay = asciiPets[timerState.mode]
-    .replace('{TIME}', formatTime(timerState.timeRemaining))
-    .replace('{STATUS}', getStatusText(timerState.mode))
-    .replace('{COMPLETED}', timerState.completedPomodoros.toString());
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isConnected, lastKeyTime, handlePopIn, handleQuit]);
 
   return (
-    <div className="terminal-container draggable h-screen w-full flex items-center justify-center bg-black">
-      <pre className="terminal non-draggable">
-{`┌──────────────────────────────────────────────┐
-${!isConnected ? '│ Not connected to main window                 │\n' : ''}│ pom0@v1.0           [Ctrl+Shift+0][POPOUT]   │
+    <TimerWrapper>
+      {(timerState, { toggleTimer, skipSession }) => {
+        // Update message when timer mode changes
+        if (message === "" || lastMode !== timerState.mode) {
+          setMessage(getRandomMessage(timerState.mode));
+          setLastMode(timerState.mode);
+        }
+
+        // Format the pet display
+        const petDisplay = asciiPets[timerState.mode]
+          .replace("{TIME}", formatTime(timerState.timeRemaining))
+          .replace("{STATUS}", getStatusText(timerState.mode))
+          .replace("{COMPLETED}", timerState.completedPomodoros.toString());
+
+        return (
+          <div className="terminal-container draggable h-screen w-full flex items-center justify-center bg-black">
+            <pre className="terminal non-draggable">
+              {`┌──────────────────────────────────────────────┐
+${!isConnected ? "│ Not connected to main window                 │\n" : ""}│ pom0@v1.0           [Ctrl+Shift+0][POPOUT]   │
 │──────────────────────────────────────────────│
 ${petDisplay}
 │                                              │
 │ ascii-pet says: "${message}"                 │
-${showHotkey ? '│ Use Ctrl+Shift+0 to activate this window       │\n' : ''}│                                              │
-│ [f]${timerState.isRunning ? 'reeze' : 'ocus'}  [s]kip  [p]opin→main  [q]uit      │
+${showHotkey ? "│ Use Ctrl+Shift+0 to activate this window       │\n" : ""}│                                              │
+│ [f]${timerState.isRunning ? "reeze" : "ocus"}  [s]kip  [p]opin→main  [q]uit      │
 └──────────────────────────────────────────────┘`}
-      </pre>
-      
-      {/* Invisible buttons for keyboard shortcuts - positioned in a grid */}
-      <div className="terminal-controls non-draggable">
-        <div className="terminal-grid">
-          <button 
-            onClick={handleFreeze}
-            className="terminal-btn freeze-btn non-draggable"
-            aria-label={timerState.isRunning ? "Freeze" : "Focus"}
-          >
-            {timerState.isRunning ? "Freeze" : "Focus"} (f)
-          </button>
-          
-          <button 
-            onClick={handleSkip}
-            className="terminal-btn skip-btn non-draggable"
-            aria-label="Skip"
-          >
-            Skip (s)
-          </button>
-          
-          <button 
-            onClick={handlePopIn}
-            className="terminal-btn popin-btn non-draggable"
-            aria-label="Pop In→Main"
-          >
-            Pop In→Main (p)
-          </button>
-          
-          <button 
-            onClick={handleQuit}
-            className="terminal-btn quit-btn non-draggable"
-            aria-label="Quit"
-          >
-            Quit (q)
-          </button>
-        </div>
-      </div>
-    </div>
+            </pre>
+
+            {/* Invisible buttons for keyboard shortcuts - positioned in a grid */}
+            <div className="terminal-controls non-draggable">
+              <div className="terminal-grid">
+                <button
+                  onClick={toggleTimer}
+                  className="terminal-btn freeze-btn non-draggable"
+                  aria-label={timerState.isRunning ? "Freeze" : "Focus"}
+                >
+                  {timerState.isRunning ? "Freeze" : "Focus"} (f)
+                </button>
+
+                <button
+                  onClick={skipSession}
+                  className="terminal-btn skip-btn non-draggable"
+                  aria-label="Skip"
+                >
+                  Skip (s)
+                </button>
+
+                <button
+                  onClick={handlePopIn}
+                  className="terminal-btn popin-btn non-draggable"
+                  aria-label="Pop In→Main"
+                >
+                  Pop In→Main (p)
+                </button>
+
+                <button
+                  onClick={handleQuit}
+                  className="terminal-btn quit-btn non-draggable"
+                  aria-label="Quit"
+                >
+                  Quit (q)
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }}
+    </TimerWrapper>
   );
-} 
+}
