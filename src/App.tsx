@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TerminalSettings } from './components/TerminalSettings';
 import { TerminalUI } from './components/TerminalUI';
 import { TerminalPopout } from './components/TerminalPopout';
@@ -13,8 +13,55 @@ function App() {
   const [isPopoutActive, setIsPopoutActive] = useState(false);
   const { state, toggleTimer, skipSession, toggleSpeedMode } = useTimer(settings);
   const [showHotkey, setShowHotkey] = useState(true);
+  const [lastKeyTime, setLastKeyTime] = useState<number>(0);
 
   const isPopoutMode = window.location.search.includes('mode=popout');
+  
+  // Define handler functions with useCallback to maintain stable references
+  const handleFreeze = useCallback(() => {
+    toggleTimer();
+  }, [toggleTimer]);
+
+  const handleSkip = useCallback(() => {
+    skipSession();
+  }, [skipSession]);
+
+  const handleSettingsClick = useCallback(() => {
+    if (state.isRunning) {
+      toggleTimer();
+    }
+    setShowSettings(true);
+  }, [state.isRunning, toggleTimer]);
+
+  const handleBackFromSettings = useCallback(() => {
+    setShowSettings(false);
+  }, []);
+
+  const handleUpdateSettings = useCallback((newSettings: TimerSettings) => {
+    console.log("Updating settings:", newSettings);
+    setSettings(newSettings);
+  }, []);
+
+  const handlePopout = useCallback(() => {
+    console.log("App: Creating popout window");
+    if (window.electronAPI) {
+      window.electronAPI.sendMessage('create-popout');
+    }
+  }, []);
+
+  const handleClosePopout = useCallback(() => {
+    console.log("App: Closing popout window");
+    if (window.electronAPI) {
+      window.electronAPI.sendMessage('close-popout');
+    }
+  }, []);
+
+  const handleQuit = useCallback(() => {
+    console.log("App: Quitting app");
+    if (window.electronAPI) {
+      window.electronAPI.sendMessage('quit-app');
+    }
+  }, []);
   
   useEffect(() => {
     console.log("App: Initializing, mode:", isPopoutMode ? "popout" : "normal");
@@ -102,6 +149,13 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showSettings) return;
       
+      // Debounce keypress events with 300ms threshold
+      const now = Date.now();
+      if (now - lastKeyTime < 300) {
+        return;
+      }
+      setLastKeyTime(now);
+      
       switch (e.key.toLowerCase()) {
         case 'f':
           e.preventDefault();
@@ -142,56 +196,21 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleTimer, skipSession, state, showSettings, isPopoutActive]);
+  }, [
+    showSettings, 
+    isPopoutActive, 
+    lastKeyTime,
+    handleFreeze,
+    handleSkip,
+    handlePopout,
+    handleClosePopout,
+    handleSettingsClick,
+    handleQuit
+  ]);
 
   if (isPopoutMode) {
     return <TerminalPopout />;
   }
-
-  const handleFreeze = () => {
-    toggleTimer();
-  };
-
-  const handleSkip = () => {
-    skipSession();
-  };
-
-  const handleSettingsClick = () => {
-    if (state.isRunning) {
-      toggleTimer();
-    }
-    setShowSettings(true);
-  };
-
-  const handleBackFromSettings = () => {
-    setShowSettings(false);
-  };
-
-  const handleUpdateSettings = (newSettings: TimerSettings) => {
-    console.log("Updating settings:", newSettings);
-    setSettings(newSettings);
-  };
-
-  const handlePopout = () => {
-    console.log("App: Creating popout window");
-    if (window.electronAPI) {
-      window.electronAPI.sendMessage('create-popout');
-    }
-  };
-
-  const handleClosePopout = () => {
-    console.log("App: Closing popout window");
-    if (window.electronAPI) {
-      window.electronAPI.sendMessage('close-popout');
-    }
-  };
-
-  const handleQuit = () => {
-    console.log("App: Quitting app");
-    if (window.electronAPI) {
-      window.electronAPI.sendMessage('quit-app');
-    }
-  };
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-black">
@@ -228,9 +247,9 @@ function App() {
 │ pom0@v1.0           [Ctrl+Shift+0][ACTIVE]   │
 │──────────────────────────────────────────────│
 │                                              │
-│ Timer is currently in popout mode            │
+│ Timer is currently in a floating window      │
 │                                              │
-${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}│ [p]opin                        [q]uit        │
+${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}│ [p]opin←float                   [q]uit        │
 └──────────────────────────────────────────────┘`}
               </pre>
               <div className="terminal-controls">
@@ -240,7 +259,7 @@ ${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}�
                     className="terminal-btn popin-btn"
                     aria-label="Close Popout"
                   >
-                    Popin (p)
+                    Popin←Float (p)
                   </button>
                   <button 
                     onClick={handleQuit}

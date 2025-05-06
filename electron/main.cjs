@@ -98,6 +98,13 @@ function createPopoutWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('popout-status', false);
       mainWindow.webContents.send('popout-closed');
+      
+      // Activate the main window to bring it to the foreground
+      console.log('Activating main window after popout closure');
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      mainWindow.show();
+      mainWindow.moveTop(); // Ensures window is on top of other applications
     }
     popoutWindow = null;
   });
@@ -122,9 +129,19 @@ function setupIPC() {
     if (popoutWindow && !popoutWindow.isDestroyed()) {
       popoutWindow.close();
     }
+    
+    // Activate the main window to bring it to the foreground
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('Activating main window after popout closure');
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      mainWindow.show();
+      mainWindow.moveTop(); // Ensures window is on top of other applications
+    }
   });
 
   ipcMain.on('toggle-timer', () => {
+    console.log('Received toggle-timer command, broadcasting to all windows');
     broadcastToAll('toggle-timer');
   });
 
@@ -167,9 +184,16 @@ function broadcastToAll(channel, data, sender = null) {
     popoutWindow && !popoutWindow.isDestroyed() ? popoutWindow : null
   ].filter(Boolean);
 
+  console.log(`Broadcasting '${channel}' to ${windows.length} windows`);
+  
   windows.forEach(win => {
     if (win && win.webContents !== sender) {
-      win.webContents.send(channel, data);
+      try {
+        win.webContents.send(channel, data);
+        console.log(`Successfully sent '${channel}' to window ${win === mainWindow ? 'main' : 'popout'}`);
+      } catch (err) {
+        console.error(`Failed to send '${channel}' to window:`, err);
+      }
     }
   });
 }

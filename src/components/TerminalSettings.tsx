@@ -13,6 +13,7 @@ export function TerminalSettings({ onBack, settings, onUpdateSettings }: Termina
   const [longBreakMinutes, setLongBreakMinutes] = useState(Math.floor(settings.longBreakDuration / 60));
   const [pomodorosUntilLongBreak, setPomodorosUntilLongBreak] = useState(settings.pomodorosUntilLongBreak);
   const [selectedField, setSelectedField] = useState<number>(0);
+  const [lastKeyTime, setLastKeyTime] = useState<number>(0);
   
   // For terminal-style input handling
   const fields = [
@@ -37,35 +38,56 @@ export function TerminalSettings({ onBack, settings, onUpdateSettings }: Termina
   // Handle keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Debounce keypress events with 300ms threshold except for arrow keys
+      // (arrow keys should be responsive for navigation)
+      const now = Date.now();
+      const isArrowKey = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase());
+      
+      if (!isArrowKey && now - lastKeyTime < 300) {
+        return;
+      }
+      
+      if (!isArrowKey) {
+        setLastKeyTime(now);
+      }
+      
       switch (e.key.toLowerCase()) {
         case 'arrowup':
+          e.preventDefault();
           setSelectedField(prev => Math.max(0, prev - 1));
           break;
         case 'arrowdown':
+          e.preventDefault();
           setSelectedField(prev => Math.min(fields.length - 1, prev + 1));
           break;
         case 'arrowleft':
+          e.preventDefault();
           if (selectedField >= 0 && selectedField < fields.length) {
             const field = fields[selectedField];
             field.setValue(Math.max(field.min, field.value - 1));
           }
           break;
         case 'arrowright':
+          e.preventDefault();
           if (selectedField >= 0 && selectedField < fields.length) {
             const field = fields[selectedField];
             field.setValue(Math.min(field.max, field.value + 1));
           }
           break;
         case 'enter':
+          e.preventDefault();
           handleSave();
           break;
         case 'escape':
+          e.preventDefault();
           onBack();
           break;
         case 'b':
+          e.preventDefault();
           onBack();
           break;
         case 's':
+          e.preventDefault();
           handleSave();
           break;
         default:
@@ -79,7 +101,8 @@ export function TerminalSettings({ onBack, settings, onUpdateSettings }: Termina
     selectedField, 
     fields, 
     onBack,
-    handleSave
+    handleSave,
+    lastKeyTime
   ]);
 
   // Generate field display with cursor highlighting the selected field

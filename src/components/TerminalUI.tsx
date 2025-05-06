@@ -66,7 +66,7 @@ ${petDisplay}
 │                                              │
 │ ascii-pet says: "${message}"                 │
 ${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}│                                              │
-│ [f]${state.isRunning ? 'reeze' : 'ocus'}  [s]kip  [p]opout  s[e]ttings  [q]uit │
+│ [f]${state.isRunning ? 'reeze' : 'ocus'}  [s]kip  [p]opout→float  s[e]ttings  [q]uit │
 └──────────────────────────────────────────────┘`}
       </pre>
       
@@ -94,7 +94,7 @@ ${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}�
             className="terminal-btn popout-btn"
             aria-label="Popout"
           >
-            Popout (p)
+            Popout→Float (p)
           </button>
           
           <button 
