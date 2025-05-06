@@ -12,12 +12,22 @@ function App() {
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [isPopoutActive, setIsPopoutActive] = useState(false);
   const { state, toggleTimer, skipSession, toggleSpeedMode } = useTimer(settings);
+  const [showHotkey, setShowHotkey] = useState(true);
 
   const isPopoutMode = window.location.search.includes('mode=popout');
   
   useEffect(() => {
     console.log("App: Initializing, mode:", isPopoutMode ? "popout" : "normal");
   }, [isPopoutMode]);
+
+  // Hide hotkey message after 10 seconds
+  useEffect(() => {
+    const hotKeyTimer = setTimeout(() => {
+      setShowHotkey(false);
+    }, 10000);
+    
+    return () => clearTimeout(hotKeyTimer);
+  }, []);
 
   useEffect(() => {
     console.log("App: Setting up IPC communication");
@@ -94,12 +104,18 @@ function App() {
       
       switch (e.key.toLowerCase()) {
         case 'f':
+          e.preventDefault();
+          e.stopPropagation();
           handleFreeze();
           break;
         case 's':
+          e.preventDefault();
+          e.stopPropagation();
           handleSkip();
           break;
         case 'p':
+          e.preventDefault();
+          e.stopPropagation();
           if (isPopoutActive) {
             handleClosePopout();
           } else {
@@ -107,9 +123,13 @@ function App() {
           }
           break;
         case 'e':
+          e.preventDefault();
+          e.stopPropagation();
           handleSettingsClick();
           break;
         case 'q':
+          e.preventDefault();
+          e.stopPropagation();
           handleQuit();
           break;
         default:
@@ -184,24 +204,33 @@ function App() {
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           {!isPopoutActive ? (
-            <TerminalUI 
-              state={state}
-              onToggleTimer={handleFreeze}
-              onSkipSession={handleSkip}
-              onSettings={handleSettingsClick}
-              onPopout={handlePopout}
-              onQuit={handleQuit}
-            />
+            <>
+              <TerminalUI 
+                state={state}
+                onToggleTimer={handleFreeze}
+                onSkipSession={handleSkip}
+                onSettings={handleSettingsClick}
+                onPopout={handlePopout}
+                onQuit={handleQuit}
+                showHotkey={showHotkey}
+              />
+              {/* Show a tooltip about the global shortcut on launch */}
+              {showHotkey && (
+                <div className="fixed bottom-4 right-4 text-green-400 text-sm font-mono">
+                  Press Ctrl+Shift+0 anytime to activate pom0
+                </div>
+              )}
+            </>
           ) : (
             <div className="terminal-container">
               <pre className="terminal">
 {`┌──────────────────────────────────────────────┐
-│ pom0@v1.0                                    │
+│ pom0@v1.0           [Ctrl+Shift+0][ACTIVE]   │
 │──────────────────────────────────────────────│
 │                                              │
 │ Timer is currently in popout mode            │
 │                                              │
-│ [p]opin                        [q]uit        │
+${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}│ [p]opin                        [q]uit        │
 └──────────────────────────────────────────────┘`}
               </pre>
               <div className="terminal-controls">

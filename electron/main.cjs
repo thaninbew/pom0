@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
@@ -13,7 +13,7 @@ function createWindow() {
     minHeight: 500,
     frame: true,
     show: false,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -54,15 +54,15 @@ function createPopoutWindow() {
   console.log('Creating popout window');
   
   popoutWindow = new BrowserWindow({
-    width: 300,
-    height: 200,
-    minWidth: 200,
-    minHeight: 150,
+    width: 400,
+    height: 300,
+    minWidth: 300,
+    minHeight: 250,
     frame: false,
     alwaysOnTop: true,
     resizable: true,
     skipTaskbar: false,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -101,6 +101,16 @@ function createPopoutWindow() {
     }
     popoutWindow = null;
   });
+}
+
+function activateWindow() {
+  if (popoutWindow && !popoutWindow.isDestroyed()) {
+    if (popoutWindow.isMinimized()) popoutWindow.restore();
+    popoutWindow.focus();
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
 }
 
 function setupIPC() {
@@ -145,6 +155,10 @@ function setupIPC() {
     console.log('Quitting application');
     app.quit();
   });
+  
+  ipcMain.on('activate-window', () => {
+    activateWindow();
+  });
 }
 
 function broadcastToAll(channel, data, sender = null) {
@@ -160,9 +174,18 @@ function broadcastToAll(channel, data, sender = null) {
   });
 }
 
+function setupGlobalShortcuts() {
+  // Register Ctrl+Shift+0 to activate the window
+  globalShortcut.register('CommandOrControl+Shift+0', () => {
+    console.log('Activating window from global shortcut');
+    activateWindow();
+  });
+}
+
 app.on('ready', () => {
   createWindow();
   setupIPC();
+  setupGlobalShortcuts();
 });
 
 app.on('window-all-closed', () => {
@@ -175,4 +198,9 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow();
   }
+});
+
+// Unregister global shortcuts when app is about to quit
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 }); 

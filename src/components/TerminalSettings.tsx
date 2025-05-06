@@ -95,7 +95,7 @@ export function TerminalSettings({ onBack, settings, onUpdateSettings }: Termina
     <div className="terminal-container">
       <pre className="terminal">
 {`┌──────────────────────────────────────────────┐
-│ pom0@v1.0 - Settings                         │
+│ pom0@v1.0 - Settings  [Ctrl+Shift+0][ACTIVE] │
 │──────────────────────────────────────────────│
 │                                              │
 ${fields.map((field, index) => 

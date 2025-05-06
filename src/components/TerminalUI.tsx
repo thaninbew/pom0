@@ -9,6 +9,7 @@ interface TerminalUIProps {
   onSettings: () => void;
   onPopout: () => void;
   onQuit: () => void;
+  showHotkey?: boolean;
 }
 
 export function TerminalUI({
@@ -18,6 +19,7 @@ export function TerminalUI({
   onSettings,
   onPopout,
   onQuit,
+  showHotkey = false,
 }: TerminalUIProps) {
   const [message, setMessage] = useState<string>('');
   
@@ -58,12 +60,12 @@ export function TerminalUI({
     <div className="terminal-container">
       <pre className="terminal">
 {`┌──────────────────────────────────────────────┐
-│ pom0@v1.0                                    │
+│ pom0@v1.0           [Ctrl+Shift+0][ACTIVE]   │
 │──────────────────────────────────────────────│
 ${petDisplay}
 │                                              │
 │ ascii-pet says: "${message}"                 │
-│                                              │
+${showHotkey ? '│ Press Ctrl+Shift+0 anytime to activate pom0    │\n' : ''}│                                              │
 │ [f]${state.isRunning ? 'reeze' : 'ocus'}  [s]kip  [p]opout  s[e]ttings  [q]uit │
 └──────────────────────────────────────────────┘`}
       </pre>

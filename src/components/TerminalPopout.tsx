@@ -13,6 +13,7 @@ export function TerminalPopout() {
   });
   
   const [isConnected, setIsConnected] = useState(false);
+  const [showHotkey, setShowHotkey] = useState(true);
 
   useEffect(() => {
     console.log("TerminalPopout: Component mounted");
@@ -21,6 +22,9 @@ export function TerminalPopout() {
       console.log("TerminalPopout: Requesting timer state");
       window.electronAPI.sendMessage('request-timer-state');
       setIsConnected(true);
+      
+      // Focus the window to ensure it can receive keyboard events
+      window.electronAPI.sendMessage('activate-window');
     } else {
       console.log("TerminalPopout: electronAPI not available");
       setIsConnected(false);
@@ -33,9 +37,15 @@ export function TerminalPopout() {
       }
     });
 
+    // Hide the hotkey message after 10 seconds
+    const hotKeyTimer = setTimeout(() => {
+      setShowHotkey(false);
+    }, 10000);
+
     return () => {
       console.log("TerminalPopout: Component unmounting");
       window.electronAPI?.sendMessage('popout-unmounting');
+      clearTimeout(hotKeyTimer);
     };
   }, []);
 
@@ -43,6 +53,41 @@ export function TerminalPopout() {
   useEffect(() => {
     setMessage(getRandomMessage(timerState.mode));
   }, [timerState.mode, timerState.isRunning]);
+
+  // Handle keyboard events for this window
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!isConnected) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'f':
+          e.preventDefault();
+          e.stopPropagation();
+          handleFreeze();
+          break;
+        case 's':
+          e.preventDefault();
+          e.stopPropagation();
+          handleSkip();
+          break;
+        case 'p':
+          e.preventDefault();
+          e.stopPropagation();
+          handlePopIn();
+          break;
+        case 'q':
+          e.preventDefault();
+          e.stopPropagation();
+          handleQuit();
+          break;
+        default:
+          break;
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [timerState, isConnected]);
 
   // Format the pet display
   const petDisplay = asciiPets[timerState.mode]
@@ -74,12 +119,12 @@ export function TerminalPopout() {
     <div className="terminal-container draggable h-screen w-full flex items-center justify-center bg-black">
       <pre className="terminal non-draggable">
 {`┌──────────────────────────────────────────────┐
-${!isConnected ? '│ Not connected to main window                 │\n' : ''}│ pom0@v1.0                                    │
+${!isConnected ? '│ Not connected to main window                 │\n' : ''}│ pom0@v1.0           [Ctrl+Shift+0][POPOUT]   │
 │──────────────────────────────────────────────│
 ${petDisplay}
 │                                              │
 │ ascii-pet says: "${message}"                 │
-│                                              │
+${showHotkey ? '│ Use Ctrl+Shift+0 to activate this window       │\n' : ''}│                                              │
 │ [f]${timerState.isRunning ? 'reeze' : 'ocus'}  [s]kip  [p]opin  [q]uit      │
 └──────────────────────────────────────────────┘`}
       </pre>
