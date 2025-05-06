@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   asciiPets,
   getRandomMessage,
@@ -13,6 +13,10 @@ export function TerminalPopout() {
   const [showHotkey, setShowHotkey] = useState(true);
   const [lastKeyTime, setLastKeyTime] = useState<number>(0);
   const [lastMode, setLastMode] = useState<string>("");
+
+  // Refs to store timer callbacks
+  const toggleTimerRef = useRef<(() => void) | null>(null);
+  const skipSessionRef = useRef<(() => void) | null>(null);
 
   const handlePopIn = useCallback(() => {
     console.log("TerminalPopout: Popin clicked");
@@ -49,7 +53,7 @@ export function TerminalPopout() {
     };
   }, []);
 
-  // Handle keyboard events for non-timer controls
+  // Handle keyboard events for all controls
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!isConnected) return;
@@ -62,6 +66,22 @@ export function TerminalPopout() {
       setLastKeyTime(now);
 
       switch (e.key.toLowerCase()) {
+        case "f":
+          e.preventDefault();
+          e.stopPropagation();
+          if (toggleTimerRef.current) {
+            console.log("TerminalPopout: Toggle timer via keyboard");
+            toggleTimerRef.current();
+          }
+          break;
+        case "s":
+          e.preventDefault();
+          e.stopPropagation();
+          if (skipSessionRef.current) {
+            console.log("TerminalPopout: Skip session via keyboard");
+            skipSessionRef.current();
+          }
+          break;
         case "p":
           e.preventDefault();
           e.stopPropagation();
@@ -84,6 +104,10 @@ export function TerminalPopout() {
   return (
     <TimerWrapper>
       {(timerState, { toggleTimer, skipSession }) => {
+        // Store callbacks in refs for keyboard events
+        toggleTimerRef.current = toggleTimer;
+        skipSessionRef.current = skipSession;
+
         // Update message when timer mode changes
         if (message === "" || lastMode !== timerState.mode) {
           setMessage(getRandomMessage(timerState.mode));
