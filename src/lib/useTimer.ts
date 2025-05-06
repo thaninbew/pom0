@@ -199,7 +199,12 @@ export function useTimer(settings: TimerSettings = DEFAULT_SETTINGS) {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!state.isRunning) return;
+      // Don't pause the timer due to visibility changes if we're in a popout window
+      // or if the popout window is active - we want the timer to keep running
+      const isPopoutMode = window.location.search.includes('mode=popout');
+      
+      // If we're in popout mode OR if the timer isn't running, don't do anything
+      if (isPopoutMode || !state.isRunning) return;
       
       if (document.visibilityState === 'visible') {
         console.log('Page visible, resuming timer');
