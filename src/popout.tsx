@@ -1,12 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { PopoutTimer } from './components/PopoutTimer';
 import './index.css';
+import './components/Terminal.css';
+import { TerminalPopout } from './components/TerminalPopout';
 
-ReactDOM.createRoot(document.getElementById('popout-root')!).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <div className="antialiased">
-      <PopoutTimer />
-    </div>
+    <TerminalPopout />
   </React.StrictMode>,
 ); 

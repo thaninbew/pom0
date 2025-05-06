@@ -140,6 +140,11 @@ function setupIPC() {
   ipcMain.on('popout-unmounting', () => {
     console.log('Popout is unmounting');
   });
+  
+  ipcMain.on('quit-app', () => {
+    console.log('Quitting application');
+    app.quit();
+  });
 }
 
 function broadcastToAll(channel, data, sender = null) {

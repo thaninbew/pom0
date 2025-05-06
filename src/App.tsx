@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Timer } from './components/Timer';
-import { TimerControls } from './components/TimerControls';
-import { SettingsButton } from './components/SettingsButton';
-import { PopoutButton } from './components/PopoutButton';
-import { Settings } from './components/Settings';
-import { PopoutTimer } from './components/PopoutTimer';
+import { TerminalSettings } from './components/TerminalSettings';
+import { TerminalUI } from './components/TerminalUI';
+import { TerminalPopout } from './components/TerminalPopout';
 import { useTimer } from './lib/useTimer';
 import { DEFAULT_SETTINGS, TimerSettings } from './lib/types';
 import './App.css';
+import './components/Terminal.css';
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [isPopoutActive, setIsPopoutActive] = useState(false);
-  const { state, toggleTimer, skipSession, speedMultiplier, toggleSpeedMode } = useTimer(settings);
+  const { state, toggleTimer, skipSession, toggleSpeedMode } = useTimer(settings);
 
   const isPopoutMode = window.location.search.includes('mode=popout');
   
@@ -61,6 +59,11 @@ function App() {
         console.log("App: Received toggle speed command");
         toggleSpeedMode();
       });
+      
+      window.electronAPI.receive('quit-app', () => {
+        console.log("App: Received quit app command");
+        window.electronAPI?.sendMessage('quit-app');
+      });
     } else {
       console.log("App: Electron API is not available");
     }
@@ -84,9 +87,54 @@ function App() {
     });
   }, [state, isPopoutActive, isPopoutMode]);
 
+  // Add keyboard event listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (showSettings) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'f':
+          handleFreeze();
+          break;
+        case 's':
+          handleSkip();
+          break;
+        case 'p':
+          if (isPopoutActive) {
+            handleClosePopout();
+          } else {
+            handlePopout();
+          }
+          break;
+        case 'e':
+          handleSettingsClick();
+          break;
+        case 'q':
+          handleQuit();
+          break;
+        default:
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [toggleTimer, skipSession, state, showSettings, isPopoutActive]);
+
   if (isPopoutMode) {
-    return <PopoutTimer />;
+    return <TerminalPopout />;
   }
+
+  const handleFreeze = () => {
+    toggleTimer();
+  };
+
+  const handleSkip = () => {
+    skipSession();
+  };
 
   const handleSettingsClick = () => {
     if (state.isRunning) {
@@ -104,75 +152,78 @@ function App() {
     setSettings(newSettings);
   };
 
-  const handlePopoutClick = () => {
+  const handlePopout = () => {
     console.log("App: Creating popout window");
     if (window.electronAPI) {
       window.electronAPI.sendMessage('create-popout');
     }
   };
 
+  const handleClosePopout = () => {
+    console.log("App: Closing popout window");
+    if (window.electronAPI) {
+      window.electronAPI.sendMessage('close-popout');
+    }
+  };
+
+  const handleQuit = () => {
+    console.log("App: Quitting app");
+    if (window.electronAPI) {
+      window.electronAPI.sendMessage('quit-app');
+    }
+  };
+
   return (
-    <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+    <div className="h-screen w-full flex items-center justify-center bg-black">
       {showSettings ? (
-        <Settings 
+        <TerminalSettings 
           onBack={handleBackFromSettings}
           settings={settings}
           onUpdateSettings={handleUpdateSettings}
         />
       ) : (
-        <div className="w-full max-w-md p-8 relative">
-          <PopoutButton onClick={handlePopoutClick} isPopoutActive={isPopoutActive} />
-          <SettingsButton onClick={handleSettingsClick} />
-          
-          <div className="flex flex-col items-center justify-center">
-            {!isPopoutActive && (
-              <>
-                <Timer 
-                  mode={state.mode} 
-                  timeRemaining={state.timeRemaining} 
-                />
-                
-                <div className="mt-2 mb-4 text-sm text-slate-500 dark:text-slate-400">
-                  Completed: {state.completedPomodoros}
+        <div className="w-full h-full flex items-center justify-center">
+          {!isPopoutActive ? (
+            <TerminalUI 
+              state={state}
+              onToggleTimer={handleFreeze}
+              onSkipSession={handleSkip}
+              onSettings={handleSettingsClick}
+              onPopout={handlePopout}
+              onQuit={handleQuit}
+            />
+          ) : (
+            <div className="terminal-container">
+              <pre className="terminal">
+{`┌──────────────────────────────────────────────┐
+│ pom0@v1.0                                    │
+│──────────────────────────────────────────────│
+│                                              │
+│ Timer is currently in popout mode            │
+│                                              │
+│ [p]opin                        [q]uit        │
+└──────────────────────────────────────────────┘`}
+              </pre>
+              <div className="terminal-controls">
+                <div className="terminal-grid">
+                  <button 
+                    onClick={handleClosePopout}
+                    className="terminal-btn popin-btn"
+                    aria-label="Close Popout"
+                  >
+                    Popin (p)
+                  </button>
+                  <button 
+                    onClick={handleQuit}
+                    className="terminal-btn quit-btn"
+                    aria-label="Quit"
+                  >
+                    Quit (q)
+                  </button>
                 </div>
-                
-                <TimerControls 
-                  isRunning={state.isRunning} 
-                  onToggle={toggleTimer} 
-                  onSkip={skipSession}
-                  speedMultiplier={speedMultiplier}
-                  onToggleSpeed={toggleSpeedMode}
-                />
-              </>
-            )}
-
-            {isPopoutActive && (
-              <div className="flex flex-col items-center justify-center h-64">
-                <p className="text-slate-500 dark:text-slate-400">
-                  Timer is currently in popout mode
-                </p>
-                <button 
-                  onClick={() => {
-                    console.log("App: Closing popout window");
-                    window.electronAPI?.sendMessage('close-popout');
-                  }}
-                  className="mt-4 px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-md text-sm"
-                >
-                  Close Popout
-                </button>
               </div>
-            )}
-
-            {!isPopoutActive && (
-              <div className="mt-8 text-xs text-slate-400 dark:text-slate-600">
-                <div>Debug Info:</div>
-                <div>Mode: {state.mode}</div>
-                <div>Running: {state.isRunning ? 'Yes' : 'No'}</div>
-                <div>Speed: {speedMultiplier}x</div>
-                <div>Electron: {window.electronAPI ? 'Available' : 'Not Available'}</div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
