@@ -12,12 +12,15 @@ const validSendChannels = [
   "quit-app",
   "activate-window",
   "popout-unmounting",
+  "resize-window",
+  "get-window-bounds",
 ];
 
 const validReceiveChannels = [
   "timer-state-update",
   "popout-status",
   "popout-closed",
+  "window-bounds",
 ];
 
 // Create a secure, structured API
@@ -46,6 +49,15 @@ contextBridge.exposeInMainWorld("timerAPI", {
     },
     activate: () => ipcRenderer.send("activate-window"),
     quit: () => ipcRenderer.send("quit-app"),
+    resize: (width, height) => ipcRenderer.send("resize-window", { width, height }),
+    getBounds: () => {
+      return new Promise((resolve) => {
+        ipcRenderer.once("window-bounds", (_, bounds) => {
+          resolve(bounds);
+        });
+        ipcRenderer.send("get-window-bounds");
+      });
+    }
   },
 
   // Legacy API for backward compatibility - will be removed after migration

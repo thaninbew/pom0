@@ -7,6 +7,18 @@
   height: 100%;
   background-color: black;
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Special styles for popout mode - make it grabbable */
+.terminal-container.cursor-grab {
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+
+.terminal-container.cursor-grab:active {
+  cursor: grabbing;
 }
 
 .terminal {
@@ -20,6 +32,40 @@
   padding: 0;
   margin: 0;
   width: fit-content;
+  align-self: flex-start;
+  margin-top: 0;
+}
+
+/* Real box styling */
+.terminal-box {
+  color: #33ff33; /* Terminal green */
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  user-select: none;
+  background-color: black;
+  border: 1px solid #33ff33;
+  width: fit-content;
+  align-self: flex-start;
+  min-width: 450px;
+  -webkit-app-region: drag;
+  box-shadow: 0 0 5px rgba(51, 255, 51, 0.2); /* Subtle glow */
+  line-height: 1.3;
+}
+
+/* Terminal text color */
+.text-terminal-green {
+  color: #33ff33;
+}
+
+.terminal-content {
+  min-height: 150px;
+  line-height: 1.2;
+  /* Preserve whitespace formatting */
+  white-space: pre-wrap;
+}
+
+.border-terminal-green {
+  border-color: #33ff33;
 }
 
 /* Hide buttons visually but keep them accessible */
@@ -58,6 +104,7 @@
   height: 50px; /* Fixed height for better tappability */
   margin: 5px;
   pointer-events: auto; /* Ensure the buttons can be clicked */
+  -webkit-app-region: no-drag;
 }
 
 /* Button grid layout */
@@ -86,4 +133,23 @@
 .non-draggable {
   -webkit-app-region: no-drag;
   cursor: default;
+}
+
+/* Make sure buttons in popout mode aren't draggable */
+.terminal-container.cursor-grab .terminal-btn,
+.terminal-container.cursor-grab .resize-handle {
+  -webkit-app-region: no-drag;
+}
+
+/* Resize handle styling */
+.resize-handle {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  z-index: 1000;
+  cursor: nwse-resize;
+  transition: opacity 0.2s ease;
 } 

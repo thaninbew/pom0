@@ -20,6 +20,9 @@ declare global {
         onPopoutClosed: (callback: () => void) => void;
         activate: () => void;
         quit: () => void;
+        // Window resize methods
+        resize?: (width: number, height: number) => void;
+        getBounds?: () => Promise<{ width: number; height: number }>;
       };
       // Legacy API
       electronAPI?: {

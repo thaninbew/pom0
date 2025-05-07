@@ -94,6 +94,9 @@ function createPopoutWindow() {
     resizable: true,
     skipTaskbar: false,
     backgroundColor: "#000000",
+    transparent: false,
+    hasShadow: false, // Remove window shadow
+    titleBarStyle: 'hidden',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -101,6 +104,9 @@ function createPopoutWindow() {
       backgroundThrottling: false, // Prevent throttling when in background
     },
   });
+
+  // Make window draggable from anywhere
+  popoutWindow.setMovable(true);
 
   const popoutUrl = isDev
     ? "http://localhost:5173?mode=popout"
@@ -364,7 +370,39 @@ function broadcastTimerState() {
 }
 
 function setupIPC() {
-  // Window management
+  ipcMain.on("toggle-timer", () => {
+    timerState.isRunning = !timerState.isRunning;
+    console.log("Timer toggled:", timerState.isRunning ? "running" : "paused");
+
+    if (timerState.isRunning) {
+      startTimer();
+    } else {
+      stopTimer();
+    }
+
+    broadcastTimerState();
+  });
+
+  ipcMain.on("skip-session", () => {
+    console.log("Skipping current session");
+    isTransitioning = true;
+    stopTimer();
+    handleSessionComplete();
+    isTransitioning = false;
+  });
+
+  ipcMain.on("toggle-speed", () => {
+    timerState.speedMultiplier = timerState.speedMultiplier === 1 ? 5 : 1;
+    console.log("Timer speed set to:", timerState.speedMultiplier);
+    
+    if (timerState.isRunning) {
+      stopTimer();
+      startTimer(); // Restart with new speed
+    }
+    
+    broadcastTimerState();
+  });
+
   ipcMain.on("create-popout", () => {
     createPopoutWindow();
   });
@@ -375,41 +413,59 @@ function setupIPC() {
     }
   });
 
+  ipcMain.on("request-timer-state", (event) => {
+    event.sender.send("timer-state-update", timerState);
+  });
+
+  ipcMain.on("update-settings", (event, settings) => {
+    console.log("Received settings update:", settings);
+    
+    timerState = {
+      ...timerState,
+      settings: { ...settings },
+      pomodorosUntilLongBreak: settings.pomodorosUntilLongBreak,
+    };
+    
+    // Update the current timeRemaining if needed
+    if (!timerState.isRunning) {
+      timerState.timeRemaining = getTimeForMode(timerState.mode);
+    }
+    
+    broadcastTimerState();
+  });
+
   ipcMain.on("activate-window", () => {
     activateWindow();
   });
 
   ipcMain.on("quit-app", () => {
-    console.log("Quitting application");
     app.quit();
   });
 
-  // Timer commands
-  ipcMain.on("toggle-timer", () => {
-    console.log("Received toggle-timer command");
-    toggleTimer();
+  // Add handler for resize window
+  ipcMain.on("resize-window", (event, { width, height }) => {
+    try {
+      const sourceWindow = BrowserWindow.fromWebContents(event.sender);
+      if (sourceWindow && !sourceWindow.isDestroyed()) {
+        sourceWindow.setSize(width, height);
+      }
+    } catch (err) {
+      console.error("Error resizing window:", err);
+    }
   });
 
-  ipcMain.on("skip-session", () => {
-    console.log("Received skip-session command");
-    skipSession();
-  });
-
-  ipcMain.on("toggle-speed", () => {
-    console.log("Received toggle-speed command");
-    toggleSpeedMode();
-  });
-
-  // Settings
-  ipcMain.on("update-settings", (event, settings) => {
-    console.log("Received settings update");
-    updateSettings(settings);
-  });
-
-  // Timer state requests
-  ipcMain.on("request-timer-state", () => {
-    console.log("Received request for timer state, broadcasting current state");
-    broadcastTimerState();
+  // Add handler for getting window bounds
+  ipcMain.on("get-window-bounds", (event) => {
+    try {
+      const sourceWindow = BrowserWindow.fromWebContents(event.sender);
+      if (sourceWindow && !sourceWindow.isDestroyed()) {
+        const bounds = sourceWindow.getBounds();
+        event.sender.send("window-bounds", bounds);
+      }
+    } catch (err) {
+      console.error("Error getting window bounds:", err);
+      event.sender.send("window-bounds", { width: 400, height: 300 });
+    }
   });
 }
 

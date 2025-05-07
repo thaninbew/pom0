@@ -6,7 +6,9 @@ import {
   getStatusText,
 } from "../lib/asciiPet";
 import { TimerWrapper } from "./TimerWrapper";
+// Import types but don't use directly as they're implied through TimerWrapper
 
+// This component is ONLY used for the popout window mode
 export function TerminalPopout() {
   const [message, setMessage] = useState<string>("");
   const [isConnected, setIsConnected] = useState(false);
@@ -17,6 +19,9 @@ export function TerminalPopout() {
   // Refs to store timer callbacks
   const toggleTimerRef = useRef<(() => void) | null>(null);
   const skipSessionRef = useRef<(() => void) | null>(null);
+  
+  // Ref for resize handling
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
 
   const handlePopIn = useCallback(() => {
     console.log("TerminalPopout: Popin clicked");
@@ -52,6 +57,75 @@ export function TerminalPopout() {
       clearTimeout(hotKeyTimer);
     };
   }, []);
+
+  // Set up resize functionality
+  useEffect(() => {
+    if (!window.timerAPI || !resizeHandleRef.current) return;
+    
+    const resizeHandle = resizeHandleRef.current;
+    let isResizing = false;
+    let startX = 0;
+    let startY = 0;
+    let startWidth = 600; // Default width
+    let startHeight = 400; // Default height
+    
+    const startResize = async (e: MouseEvent) => {
+      isResizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      // Get current window size using the proper API
+      try {
+        // The getBounds method now returns a Promise with window bounds
+        if (window.timerAPI?.window.getBounds) {
+          const bounds = await window.timerAPI.window.getBounds();
+          if (bounds) {
+            startWidth = bounds.width;
+            startHeight = bounds.height;
+          }
+        }
+      } catch (err) {
+        console.log('Unable to get window bounds, using defaults', err);
+      }
+      
+      document.addEventListener('mousemove', resize);
+      document.addEventListener('mouseup', stopResize);
+      
+      e.preventDefault();
+    };
+    
+    const resize = (e: MouseEvent) => {
+      if (!isResizing || !window.timerAPI?.window.resize) return;
+      
+      // Calculate new width and height
+      const newWidth = startWidth + (e.clientX - startX);
+      const newHeight = startHeight + (e.clientY - startY);
+      
+      // Minimum size constraints
+      const minWidth = 600;
+      const minHeight = 300;
+      
+      // Use the resize method from the API
+      window.timerAPI.window.resize(
+        Math.max(minWidth, newWidth),
+        Math.max(minHeight, newHeight)
+      );
+    };
+    
+    const stopResize = () => {
+      isResizing = false;
+      document.removeEventListener('mousemove', resize);
+      document.removeEventListener('mouseup', stopResize);
+    };
+    
+    resizeHandle.addEventListener('mousedown', startResize);
+    
+    return () => {
+      resizeHandle.removeEventListener('mousedown', startResize);
+      document.removeEventListener('mousemove', resize);
+      document.removeEventListener('mouseup', stopResize);
+    };
+  }, [isConnected]);
 
   // Handle keyboard events for all controls
   useEffect(() => {
@@ -121,25 +195,56 @@ export function TerminalPopout() {
           .replace("{COMPLETED}", timerState.completedPomodoros.toString());
 
         return (
-          <div className="terminal-container draggable h-screen w-full flex items-center justify-center bg-black">
-            <pre className="terminal non-draggable">
-              {`┌──────────────────────────────────────────────┐
-${!isConnected ? "│ Not connected to main window                 │\n" : ""}│ pom0@v1.0           [Ctrl+Shift+0][POPOUT]   │
-│──────────────────────────────────────────────│
-${petDisplay}
-│                                              │
-│ ascii-pet says: "${message}"                 │
-${showHotkey ? "│ Use Ctrl+Shift+0 to activate this window       │\n" : ""}│                                              │
-│ [f]${timerState.isRunning ? "reeze" : "ocus"}  [s]kip  [p]opin→main  [q]uit      │
-└──────────────────────────────────────────────┘`}
-            </pre>
+          <div className="terminal-container h-screen w-full flex flex-col items-start justify-start bg-black cursor-grab active:cursor-grabbing">
+            <div className="terminal-box w-auto font-mono text-terminal-green">
+              {/* Header section */}
+              <div className="terminal-header px-4 py-1 border-b border-terminal-green flex justify-between">
+                <div>pom0@v1.0</div>
+                <div>[Ctrl+Shift+0][POPOUT]</div>
+              </div>
+              
+              {/* Not connected message (conditional) */}
+              {!isConnected && (
+                <div className="px-4 py-1 border-b border-terminal-green">
+                  Not connected to main window
+                </div>
+              )}
+              
+              {/* Main content section - ASCII pet */}
+              <div className="terminal-content px-4 py-2 whitespace-pre font-mono">
+                {petDisplay}
+              </div>
+              
+              {/* Empty line before message */}
+              <div className="px-4 py-1"></div>
+              
+              {/* Message section */}
+              <div className="terminal-message px-4 py-1">
+                ascii-pet says: "{message}"
+              </div>
+              
+              {/* Hotkey message (conditional) */}
+              {showHotkey && (
+                <div className="terminal-hotkey px-4 py-1">
+                  Use Ctrl+Shift+0 to activate this window
+                </div>
+              )}
+              
+              {/* Empty line before footer */}
+              <div className="px-4 py-1"></div>
+              
+              {/* Footer section with controls */}
+              <div className="terminal-footer px-4 py-1 border-t border-terminal-green">
+                [f]{timerState.isRunning ? "reeze" : "ocus"}  [s]kip  [p]opin→main  [q]uit
+              </div>
+            </div>
 
             {/* Invisible buttons for keyboard shortcuts - positioned in a grid */}
-            <div className="terminal-controls non-draggable">
+            <div className="terminal-controls">
               <div className="terminal-grid">
                 <button
                   onClick={toggleTimer}
-                  className="terminal-btn freeze-btn non-draggable"
+                  className="terminal-btn freeze-btn cursor-pointer"
                   aria-label={timerState.isRunning ? "Freeze" : "Focus"}
                 >
                   {timerState.isRunning ? "Freeze" : "Focus"} (f)
@@ -147,7 +252,7 @@ ${showHotkey ? "│ Use Ctrl+Shift+0 to activate this window       │\n" : ""}�
 
                 <button
                   onClick={skipSession}
-                  className="terminal-btn skip-btn non-draggable"
+                  className="terminal-btn skip-btn cursor-pointer"
                   aria-label="Skip"
                 >
                   Skip (s)
@@ -155,7 +260,7 @@ ${showHotkey ? "│ Use Ctrl+Shift+0 to activate this window       │\n" : ""}�
 
                 <button
                   onClick={handlePopIn}
-                  className="terminal-btn popin-btn non-draggable"
+                  className="terminal-btn popin-btn cursor-pointer"
                   aria-label="Pop In→Main"
                 >
                   Pop In→Main (p)
@@ -163,12 +268,28 @@ ${showHotkey ? "│ Use Ctrl+Shift+0 to activate this window       │\n" : ""}�
 
                 <button
                   onClick={handleQuit}
-                  className="terminal-btn quit-btn non-draggable"
+                  className="terminal-btn quit-btn cursor-pointer"
                   aria-label="Quit"
                 >
                   Quit (q)
                 </button>
               </div>
+            </div>
+            
+            {/* Resize handle in the bottom right corner */}
+            <div 
+              ref={resizeHandleRef}
+              className="resize-handle absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize opacity-50 hover:opacity-100"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="white"
+                width="24" 
+                height="24"
+              >
+                <path d="M22 22H16V16H22V22ZM22 2V14H16V8H10V2H22Z" />
+              </svg>
             </div>
           </div>
         );
